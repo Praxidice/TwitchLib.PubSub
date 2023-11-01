@@ -291,17 +291,23 @@ namespace TwitchLib.PubSub
         /// Fires when a moderation event hits a user
         /// </summary>
         public event EventHandler<OnAutomodCaughtUserMessage> OnAutomodCaughtUserMessage;
+
+        /// <summary>
+        /// Occurs when a hype train event is received.
+        /// </summary>
+        public event EventHandler<OnHypeTrainArgs> OnHypeTrain;
         #endregion
 
         /// <summary>
         /// Constructor for a client that interface's with Twitch's PubSub system.
         /// </summary>
         /// <param name="logger">Optional ILogger param to enable logging</param>
-        public TwitchPubSub(ILogger<TwitchPubSub> logger = null)
+        /// <param name="ssl">Use SSL or not</param>
+        public TwitchPubSub(ILogger<TwitchPubSub> logger = null, bool ssl = true)
         {
             _logger = logger;
 
-            var options = new ClientOptions(clientType: ClientType.PubSub);
+            var options = new ClientOptions(clientType: ClientType.PubSub, useSsl: ssl);
             _socket = new WebSocketClient(options);
 
             _socket.OnConnected += Socket_OnConnectedAsync;
@@ -415,6 +421,8 @@ namespace TwitchLib.PubSub
         private async Task ParseMessageAsync(string message)
         {
             var type = JObject.Parse(message).SelectToken("type")?.ToString();
+
+            _logger?.LogTrace($"Type: {type}");
 
             switch (type?.ToLower())
             {
@@ -681,6 +689,12 @@ namespace TwitchLib.PubSub
                                     break;
                             }
                             return;
+
+                        case "hype-train-events-v1":
+                            var hype = msg.MessageData as HypeTrainEvents;
+                            OnHypeTrain?.Invoke(this, hype?.Data);
+                            _logger?.LogInformation($"HYPE CAUGHT");
+                            return;
                     }
                     break;
                 case "pong":
@@ -774,6 +788,8 @@ namespace TwitchLib.PubSub
             {
                 ((JObject)jsonData.SelectToken("data"))?.Add(new JProperty("auth_token", oauth));
             }
+
+            _logger.LogTrace("Sending:" + jsonData.ToString());
 
             await _socket.SendAsync(jsonData.ToString());
 
@@ -995,21 +1011,37 @@ namespace TwitchLib.PubSub
             _topicToChannelId[topic] = channelTwitchId;
             ListenToTopic(topic);
         }
+
+        /// <inheritdoc />
+        /// <summary>
+        /// Hype train events for a specified channel. Does not include final rewards.
+        /// </summary>
+        /// <param name="channelTwitchId">The channel twitch identifier.</param>
+        public void ListenToHypeTrains(string channelTwitchId)
+        {
+            var topic = $"hype-train-events-v1.{channelTwitchId}";
+            _topicToChannelId[topic] = channelTwitchId;
+            ListenToTopic(topic);
+
+            topic = $"hype-train-events-v1.rewards.{channelTwitchId}";
+            _topicToChannelId[topic] = channelTwitchId;
+            ListenToTopic(topic);
+        }
         #endregion
 
         /// <inheritdoc />
         /// <summary>
         /// Method to connect to Twitch's PubSub service. You MUST listen toOnConnected event and listen to a Topic within 15 seconds of connecting (or be disconnected)
         /// </summary>
-        public void Connect()
+        public bool Connect()
         {
-            ConnectAsync().GetAwaiter().GetResult();
+            return ConnectAsync().GetAwaiter().GetResult();
         }
         
         /// <inheritdoc />
-        public async Task ConnectAsync()
+        public async Task<bool> ConnectAsync()
         {
-            await _socket.OpenAsync();
+            return await _socket.OpenAsync();
         }
 
         /// <inheritdoc />

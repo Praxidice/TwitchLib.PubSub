@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Linq;
 using TwitchLib.PubSub.Models.Responses.Messages;
 using TwitchLib.PubSub.Models.Responses.Messages.UserModerationNotifications;
 
@@ -29,7 +30,8 @@ namespace TwitchLib.PubSub.Models.Responses
             var json = JObject.Parse(jsonStr).SelectToken("data");
             Topic = json.SelectToken("topic")?.ToString();
             var encodedJsonMessage = json.SelectToken("message").ToString();
-            switch (Topic?.Split('.')[0])
+            var splitTopic = Topic?.Split('.');
+            switch (splitTopic?[0] ?? "")
             {
                 case "user-moderation-notifications":
                     MessageData = new UserModerationNotifications(encodedJsonMessage);
@@ -82,6 +84,9 @@ namespace TwitchLib.PubSub.Models.Responses
                     break;
                 case "low-trust-users":
                     MessageData = new LowTrustUsers(encodedJsonMessage);
+                    break;
+                case "hype-train-events-v1":
+                    MessageData = new HypeTrainEvents(encodedJsonMessage, splitTopic.Last());
                     break;
             }
         }

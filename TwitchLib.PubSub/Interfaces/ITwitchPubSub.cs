@@ -60,6 +60,10 @@ namespace TwitchLib.PubSub.Interfaces
         /// </summary>
         event EventHandler<OnHostArgs> OnHost;
         /// <summary>
+        /// Occurs when a hype train event is received.
+        /// </summary>
+        event EventHandler<OnHypeTrainArgs> OnHypeTrain;
+        /// <summary>
         /// Occurs when [on message deleted].
         /// </summary>
         event EventHandler<OnMessageDeletedArgs> OnMessageDeleted; 
@@ -191,12 +195,12 @@ namespace TwitchLib.PubSub.Interfaces
         /// <summary>
         /// Connects this instance.
         /// </summary>
-        void Connect();
+        bool Connect();
         
         /// <summary>
         /// Connects this instance.
         /// </summary>
-        Task ConnectAsync();
+        Task<bool> ConnectAsync();
         
         /// <summary>
         /// Disconnects this instance.
